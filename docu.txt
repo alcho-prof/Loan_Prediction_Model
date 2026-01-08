@@ -1,0 +1,68 @@
+LOAN PREDICTION MODEL DOCUMENTATION
+===================================
+
+1. PREDICTION LOGIC & CALCULATIONS
+----------------------------------
+The model is a **Gradient Boosting Classifier** trained on historical loan data.
+It takes user input and converts it into a numerical vector of 12 features before prediction.
+
+Preprocessing Logic:
+- **Gender**: Male = 1, Female = 0
+- **Married**: Yes = 1, No = 0
+- **Dependents**: Direct mapping ('0'->0, '1'->1, '2'->2, '3+'->3)
+- **Education**: Graduate = 0, Not Graduate = 1
+- **Self_Employed**: Yes = 1, No = 0
+- **Property_Area**: One-Hot Encoded (Semiurban=1/0, Urban=1/0)
+- **Income & Loan**: Passed as numeric values.
+
+2. INPUT SCALING & LOAN-TO-INCOME RATIO
+---------------------------------------
+Crucially, the model expects inputs in specific units based on the training dataset.
+
+* **Applicant Income**: Verified Monthly Income (e.g., 5000 means $5,000).
+* **Loan Amount**: In **THOUSANDS**. (e.g., 150 means $150,000).
+
+The "Loan to Income" ratio is calculated implicitly by the Gradient Boosting trees, but mathematically it looks like this:
+   
+   Ratio = (Loan Amount * 1000) / (Monthly Income * Term)
+
+However, the model often learns simpler heuristics, effectively capping the Loan Amount absolute value regardless of income.
+
+3. WHY WERE INPUTS REJECTED?
+----------------------------
+Most rejections encountered were due to **Unit Mismatches** (Scaling Issues).
+
+Case 1: User Argument
+- User Input: Income 200,000 | Loan 2,000,000
+- Model Interpretation: Income $200k/mo | Loan $2 BILLION (2000000 * 1000).
+- Result: **REJECTED** (Extreme Outlier).
+
+Case 2: User Argument (Corrected Ratio, High Values)
+- User Input: Income 60,000 | Loan 2,000 
+- Interpretation: Income $60k/mo | Loan $2 Million.
+- Result: **REJECTED**.
+- Reason: Although the ratio is healthy, a Loan Amount of '2000' is an anomaly. The model was trained on loans typically between 100-300. Values > 500 are often penalized heavily by the decision trees.
+
+4. OPTIMAL INPUT VALUES FOR APPROVAL
+------------------------------------
+To get an approval, inputs must usually stay within the "Typical Distribution" of the training data.
+
+Standard Approval Profile:
+-------------------------
+- **Applicant Income**: 5000  ($5,000/mo)
+- **Loan Amount**:      150   ($150,000)
+- **Credit History**:   1.0   (Good)
+- **Loan Term**:        360   (30 Years)
+
+High Income Profile (Limit):
+---------------------------
+- **Applicant Income**: 10,000 - 20,000
+- **Loan Amount**:      250 - 600
+- **Credit History**:   1.0
+
+Maximum Detected Limits:
+------------------------
+- Max Income tested: ~50,000
+- Max Loan tested:   ~950  (Approaching 1 Million)
+
+Any Loan Amount entered above **1000** is highly likely to be rejected regardless of income.
