@@ -1,11 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 
 :root {
-    --text-color: #000000;
-    --bg-color: #ffffff;
-    --border-color: #000000;
-    --input-bg: #ffffff;
-    --highlight: #000000;
+    --bg-color: #f3f4f6;
+    /* Soft gray background */
+    --card-bg: #ffffff;
+    --text-primary: #374151;
+    /* Dark gray, softer than black */
+    --text-secondary: #6b7280;
+    --primary-color: #6366f1;
+    /* Soft Indigo */
+    --primary-hover: #4f46e5;
+    --border-color: #e5e7eb;
+    --input-bg: #f9fafb;
+    --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
 
 * {
@@ -16,13 +23,13 @@
 
 body {
     font-family: 'Inter', sans-serif;
-    background: var(--bg-color);
-    color: var(--text-color);
+    background-color: var(--bg-color);
+    color: var(--text-primary);
     min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    overflow-x: hidden;
+    line-height: 1.5;
 }
 
 .container {
@@ -32,22 +39,22 @@ body {
 }
 
 .glass-card {
-    background: var(--bg-color);
-    border: 2px solid var(--border-color);
-    border-radius: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    /* Soft rounded corners */
     padding: 3rem;
-    box-shadow: 10px 10px 0px rgba(0, 0, 0, 1);
-    animation: fadeIn 0.5s ease-out;
+    box-shadow: var(--shadow-soft);
+    animation: fadeIn 0.6s ease-out;
 }
 
 h1 {
-    font-size: 2.5rem;
+    font-size: 2rem;
     font-weight: 600;
     margin-bottom: 2rem;
     text-align: center;
-    color: var(--text-color);
-    text-transform: uppercase;
-    letter-spacing: 2px;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
 }
 
 .form-grid {
@@ -63,34 +70,34 @@ h1 {
 
 label {
     margin-bottom: 0.5rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-color);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
 }
 
 input,
 select {
-    padding: 1rem;
-    border-radius: 0;
-    border: 2px solid var(--border-color);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
     background: var(--input-bg);
-    color: var(--text-color);
-    font-size: 1rem;
+    color: var(--text-primary);
+    font-size: 0.95rem;
     outline: none;
     transition: all 0.2s ease;
 }
 
 input:focus,
 select:focus {
-    background: #000;
-    color: #fff;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    /* Soft focus ring */
+    background: #fff;
 }
 
 select option {
     background: #fff;
-    color: #000;
+    color: var(--text-primary);
 }
 
 .full-width {
@@ -100,65 +107,67 @@ select option {
 button {
     margin-top: 2rem;
     padding: 1rem 2rem;
-    background: #000;
-    border: 2px solid #000;
-    border-radius: 0;
-    color: #fff;
-    font-size: 1.1rem;
-    font-weight: 600;
-    text-transform: uppercase;
+    background-color: var(--primary-color);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 1rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background-color 0.2s, transform 0.1s;
     width: 100%;
+    box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2);
 }
 
 button:hover {
-    background: #fff;
-    color: #000;
-    box-shadow: 5px 5px 0px rgba(0, 0, 0, 0.5);
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
 }
 
 button:active {
-    transform: translate(2px, 2px);
-    box-shadow: none;
+    transform: translateY(0);
 }
 
 #result {
     margin-top: 2rem;
     padding: 1.5rem;
-    border: 2px solid #000;
-    border-radius: 0;
+    border-radius: 12px;
     text-align: center;
-    font-size: 1.2rem;
-    font-weight: 600;
+    font-size: 1.1rem;
+    font-weight: 500;
     opacity: 0;
     transition: opacity 0.5s ease;
 }
 
 .eligible {
-    background: #fff;
-    border-color: #000;
-    color: #000;
+    background-color: #ecfdf5;
+    /* Very light green */
+    border: 1px solid #a7f3d0;
+    color: #047857;
 }
 
 .not-eligible {
-    background: #000;
-    color: #fff;
-    border-color: #000;
+    background-color: #fef2f2;
+    /* Very light red */
+    border: 1px solid #fecaca;
+    color: #b91c1c;
 }
 
 .not-eligible strong {
-    color: #fff;
+    color: #b91c1c;
+    display: block;
+    margin-bottom: 0.25rem;
 }
 
 ul {
-    list-style-type: square;
+    list-style-type: disc;
+    color: var(--text-primary);
 }
 
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(10px);
     }
 
     to {

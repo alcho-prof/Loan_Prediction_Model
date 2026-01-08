@@ -49,7 +49,7 @@ async def predict(data: LoanApplication):
     married_val = 1 if data.Married == "Yes" else 0
     
     # 3. Dependents (0, 1, 2, 3)
-    dep_map = {'0': 0, '1': 1, '2': 2, '3+': 3}
+    dep_map = {'0': 0, '1': 1, '2': 2, '3': 3}
     dep_val = dep_map[data.Dependents]
     
     # 4. Education (Graduate=0, Not Graduate=1) - Alphabetical
@@ -79,69 +79,103 @@ async def predict(data: LoanApplication):
         urban
     ]
     
+    # --- SMART SCALING WRAPPER ---
+    BASELINE_INCOME = 5000.0
+    total_input_income = data.ApplicantIncome + data.CoapplicantIncome
+    
+    # Safety Check: If Loan is outrageously high (e.g. > 5000 which implies 5 Million), reject immediately.
+    # The model expects "150" for 150k. So 5000 means 5 Million.
+    # 3000000 means 3 Billion. That's definitely a user typo or joke.
+    if data.LoanAmount > 10000:
+         # Hard Reject for unrealistic numbers
+         return {
+             "prediction": "Not Eligible", 
+             "reason": [f"Loan Amount ({data.LoanAmount}) is realistically too high (likely typo?). Please check units."]
+         }
+    
+    # Use scaling only if income is significantly higher than baseline
+    if total_input_income > 15000:
+        scale_factor = total_input_income / BASELINE_INCOME
+        
+        # Scale fields
+        model_applicant_income = data.ApplicantIncome / scale_factor
+        model_coapplicant_income = data.CoapplicantIncome / scale_factor
+        model_loan_amount = data.LoanAmount / scale_factor
+        
+        # Second Safety Check:
+        # If the Scaled Loan Amount is still huge (like 300,000), it means the original input was MASSIVE relative to income.
+        # e.g Income 50k, Loan 3M. Factor=10. Scaled Income=5k. Scaled Loan=300k.
+        # 300k is huge for 5k income.
+        
+        input_ratio = data.LoanAmount / (total_input_income + 1)
+        # Normal ratio is ~0.03.
+        # Your case: 3,000,000 / 50,000 = 60.0 !
+        
+        if input_ratio > 0.5: # Generous upper bound (Loan is 50% of monthly income? No, 0.5 implies Loan amount (k) is half of income (units))
+             # Wait, units. 150 (k) / 5000 = 0.03.
+             # 0.5 means Loan is 16x larger than typical ratio.
+             return {
+                 "prediction": "Not Eligible",
+                 "reason": ["Loan Amount is exceptionally high compared to Income."]
+             }
+    else:
+        # Use raw values
+        model_applicant_income = data.ApplicantIncome
+        model_coapplicant_income = data.CoapplicantIncome
+        model_loan_amount = data.LoanAmount
+
+    # Conversion: Term (Years) -> Term (Months)
+    # The dataset uses '360' for 30 years. So 1 Year = 12 Months.
+    # User inputs Years (e.g. 30). We convert to 360.
+    model_term = data.Loan_Amount_Term * 12
+
+    # Construct feature vector
+    features = [
+        gender_val,
+        married_val,
+        dep_val,
+        edu_val,
+        self_emp_val,
+        model_applicant_income,
+        model_coapplicant_income,
+        model_loan_amount,
+        model_term, # Converted to months
+        data.Credit_History,
+        semiurban,
+        urban
+    ]
+    
     # Predict
     try:
-        # Reshape to (1, 12)
+        # Reshape and Predict
         final_features = np.array([features])
-        prediction = model.predict(final_features)[0]
+        prob_array = model.predict_proba(final_features)[0]
+        prob_score = prob_array[1] # Probability of Approval
         
-        # Interpret prediction
-        if str(prediction) == '1' or str(prediction) == 'Y' or str(prediction) == '1.0':
+        # Decision Threshold
+        if prob_score >= 0.45:
             result = "Eligible"
             reason = []
         else:
             result = "Not Eligible"
             reason = []
             
-            # 1. Check Credit History
+            # Reasons...
             if data.Credit_History == 0.0:
-                reason.append("Credit History is poor (0.0). This is a critical factor for approval.")
+                reason.append("Credit History is marked as poor (0.0).")
+            
+            # Scaled Ratio Check
+            scaled_total_income = model_applicant_income + model_coapplicant_income
+            ratio = model_loan_amount / (scaled_total_income + 1)
+            
+            if ratio > 0.06: 
+                reason.append("Loan amount is too high relative to the provided income.")
                 
-            # 2. Check Loan to Income Ratio
-            total_income = data.ApplicantIncome + data.CoapplicantIncome
-            # LoanAmount is in thousands so multiply by 1000 for actual value comparison? 
-            # OR typically dataset assumes LoanAmount=100 means 100k, and Income=5000 means 5k monthly.
-            # Let's look at standard ratios.
-            # If user entered 200,000 income and 2,000,000 loan:
-            # Ratio = 2000000 / 300000 = 6.6
-            
-            # Wait, usually Income is Monthly. 360 term is 30 years.
-            # Loan 2,000,000. Income 300,000 monthly.
-            # Annual Income = 3,600,000. Loan is < 1 year income. That should be approved!
-            
-            # HOWEVER, the model sees: Income=200,000, Loan=2,000,000.
-            # The training data usually has Input: Income=5000, Loan=150.
-            # Feature scaling issues? Gradient Boosting handles unscaled data well, BUT:
-            # If training data max income was 50,000 and user puts 200,000, it's out of distribution.
-            # BUT key is likely the ratio the trees learned.
-            
-            # Heuristic for user feedback:
-            # If LoanAmount > (TotalIncome * 0.5): # Very rough approximation relative to typical dataset values
-            # (In dataset: Loan 150 vs Income 5000. Ratio 0.03)
-            # (User Input: Loan 2,000,000 vs Income 300,000. Ratio 6.66)
-            # The user input Loan is massively larger relative to Income compared to training data.
-            
-            ratio = data.LoanAmount / (total_income + 1) # Avoid div/0
-            if ratio > 0.1: # Threshold based on typical dataset values (150/5000 = 0.03)
-                reason.append("Loan Amount is too high relative to Income.")
-                
-            if not reason:
-                 # Check for the specific case user reported: 
-                 # Features: [1, 1, 1, 0, 1, 20000, 40000, 2000, 360, 1.0, 1, 0]
-                 # Ratio is 0.033, which is fine.
-                 # Credit history is 1.0 (Good).
-                 # Income is high (20k + 40k = 60k).
-                 # Loan is 2000 (2 million? or 2k? in context of 150 mean).
-                 # If 2000 is 2M, it's 13x the average loan of 150.
-                 # Even if income is high, the model might penalize extreme loan amounts regardless of income.
-                 # Gradient Boosting trees often have threshold splits. If LoanAmount > X, prob decreases.
+            if data.Loan_Amount_Term < 300:
+                 reason.append("Short loan term increases monthly obligation.")
                  
-                 if data.LoanAmount > 500:
-                     reason.append(f"Loan Amount ({data.LoanAmount}) is significantly higher than the typical range (100-200).")
-                 elif data.Loan_Amount_Term < 360:
-                     reason.append("Loan term is shorter than standard (360 days), increasing monthly burden.")
-                 else:
-                     reason.append("The combination of Applicant Income and Loan Amount does not fit the approval profile pattern.")
+            if not reason:
+                 reason.append(f"The calculated probability ({prob_score:.2f}) is below the approval threshold.")
             
         return {"prediction": result, "reason": reason}
     except Exception as e:
