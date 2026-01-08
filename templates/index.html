@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loan Eligibility Predictor</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="glass-card">
+            <h1><i class="fas fa-hand-holding-usd"></i> Loan Predictor</h1>
+            <form id="predictionForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Gender</label>
+                        <select name="Gender" required>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Marital Status</label>
+                        <select name="Married" required>
+                            <option value="Yes">Married</option>
+                            <option value="No">Single</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Dependents</label>
+                        <select name="Dependents" required>
+                            <option value="0">0</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3+">3+</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Education</label>
+                        <select name="Education" required>
+                            <option value="Graduate">Graduate</option>
+                            <option value="Not Graduate">Not Graduate</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Self Employed</label>
+                        <select name="Self_Employed" required>
+                            <option value="No">No</option>
+                            <option value="Yes">Yes</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Applicant Income ($)</label>
+                        <input type="number" name="ApplicantIncome" placeholder="e.g. 5000" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Co-Applicant Income ($)</label>
+                        <input type="number" name="CoapplicantIncome" placeholder="e.g. 2000" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Loan Amount (Thousands)</label>
+                        <input type="number" name="LoanAmount" placeholder="e.g. 150" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Loan Amount Term (Days)</label>
+                        <input type="number" name="Loan_Amount_Term" placeholder="e.g. 360" value="360" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Credit History</label>
+                        <select name="Credit_History" required>
+                            <option value="1.0">Good (1.0)</option>
+                            <option value="0.0">Bad (0.0)</option>
+                        </select>
+                    </div>
+                    <div class="full-width form-group">
+                        <label>Property Area</label>
+                        <select name="Property_Area" required>
+                            <option value="Semiurban">Semiurban</option>
+                            <option value="Urban">Urban</option>
+                            <option value="Rural">Rural</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" id="submitBtn">Check Eligibility</button>
+            </form>
+
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const resultDiv = document.getElementById('result');
+
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+            btn.disabled = true;
+            resultDiv.style.opacity = '0';
+
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            // Convert numeric types
+            data.ApplicantIncome = Number(data.ApplicantIncome);
+            data.CoapplicantIncome = Number(data.CoapplicantIncome);
+            data.LoanAmount = Number(data.LoanAmount);
+            data.Loan_Amount_Term = Number(data.Loan_Amount_Term);
+            data.Credit_History = Number(data.Credit_History);
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                });
+
+                const result = await response.json();
+
+                resultDiv.className = result.prediction === 'Eligible' ? 'eligible' : 'not-eligible';
+
+                let html = result.prediction === 'Eligible'
+                    ? `<i class="fas fa-check-circle"></i> Congratulations! Loan Approved.`
+                    : `<i class="fas fa-times-circle"></i> Sorry, Loan Application Rejected.`;
+
+                if (result.reason && result.reason.length > 0) {
+                    html += `<div style="margin-top: 1rem; font-size: 0.9rem; text-align: left;">
+                                <strong>Potential Reasons:</strong>
+                                <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                                    ${result.reason.map(r => `<li>${r}</li>`).join('')}
+                                </ul>
+                             </div>`;
+                }
+
+                resultDiv.innerHTML = html;
+
+                resultDiv.style.opacity = '1';
+
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = 'An error occurred. Please try again.';
+                resultDiv.className = 'not-eligible';
+                resultDiv.style.opacity = '1';
+            } finally {
+                btn.innerHTML = 'Check Eligibility';
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>
